@@ -41,7 +41,7 @@ def usage_tags():
            FROM usage_tags
            ORDER BY CASE tag_type WHEN 'scene' THEN 1 WHEN 'practical' THEN 2 ELSE 3 END, display_order"""
     )
-    return {"tags": rows}
+    return rows
 
 
 @app.get("/api/search")
@@ -98,11 +98,12 @@ def family_search(
     limit: int = Query(default=10, ge=1, le=50, description="返す件数"),
 ):
     """家族への誕生日タブの検索。在庫・予算・家族向けシーンタグで候補を取り（FR-03）、選んだタグとの一致数 → 人気順で並べる（FR-04）"""
-    # ① 条件：在庫あり・予算内・家族向けのシーンタグがある商品だけ（FR-03）
+    # ① 条件：在庫あり・予算内で、家族向けのシーンタグがあるか、確認済みのタグがある商品（FR-03・案3）
     where, params = ["stock > 0"], []
     placeholders = ", ".join(["%s"] * len(FAMILY_SCENES))
     where.append(
-        f"EXISTS (SELECT 1 FROM product_scenes s WHERE s.product_id = products.product_id AND s.scene_tag IN ({placeholders}))"
+        f"(EXISTS (SELECT 1 FROM product_scenes s WHERE s.product_id = products.product_id AND s.scene_tag IN ({placeholders}))"
+        " OR EXISTS (SELECT 1 FROM product_usage_tags t2 WHERE t2.product_id = products.product_id AND t2.check_status = 'ok'))"
     )
     params += list(FAMILY_SCENES)
     if price_min is not None:
@@ -120,7 +121,7 @@ def family_search(
         tag_ph = ", ".join(["%s"] * len(tag_ids))
         match_sql = f"""(SELECT COUNT(*) FROM product_usage_tags t
                           WHERE t.product_id = products.product_id
-                            AND COALESCE(t.check_status, '') <> 'ng'
+                            AND t.check_status = 'ok'
                             AND t.tag_id IN ({tag_ph}))"""
     else:
         match_sql = "0"  # タグを選んでいない（「分からない」だけ）ときは、全商品0として人気順

@@ -133,8 +133,59 @@ def family_search(
             LIMIT %s""",
         (*tag_ids, *params, limit),
     )
-        # ③ /api/search と同じ形で返す（画面は今の ResultCard をそのまま使える）
-    return {"total": total, "results": [to_gift(r) for r in rows]}
+
+
+    # ③ /api/search と同じ形に、合う理由（reasons）と声（voice）を足して返す
+    voices = fetch_voices([r["product_id"] for r in rows])
+    results = []
+    for r in rows:
+        g = to_gift(r)
+        g["reasons"] = []
+        g["voice"] = voices.get(r["product_id"])
+        results.append(g)
+    return {"total": total, "results": results}
+
+
+FAMILY_WORDS = "母|父|妻|夫|兄|姉|弟|妹|義"
+FRIEND_WORDS = "友人|友達|同僚|先輩|上司|知人"
+
+
+def fetch_voices(product_ids: list[str]) -> dict:
+    """商品ごとに、家族に贈った人の本文ありレビューを1件選ぶ（評価の高い順 → 新しい順）。SELECT だけ"""
+    if not product_ids:
+        return {}
+    ph = ", ".join(["%s"] * len(product_ids))
+    rows = fetch_all(
+        f"""SELECT product_id, comment, posted_at FROM (
+              SELECT r.product_id, r.comment, r.posted_at,
+                     ROW_NUMBER() OVER (PARTITION BY r.product_id
+                                        ORDER BY r.rating DESC, r.posted_at DESC, r.review_id DESC) AS rn
+              FROM reviews r
+              WHERE r.product_id IN ({ph})
+                AND CHAR_LENGTH(r.comment) > 0
+                AND r.comment REGEXP %s
+                AND NOT (r.comment REGEXP %s)
+                AND EXISTS (
+                  SELECT 1 FROM orders o
+                  JOIN order_items oi ON oi.order_id = o.order_id
+                  WHERE o.user_id = r.user_id
+                    AND oi.product_id = r.product_id
+                    AND o.estimated_scene = %s
+                    AND o.ordered_at <= r.posted_at)
+            ) v
+            WHERE v.rn = 1""",
+        (*product_ids, FAMILY_WORDS, FRIEND_WORDS, "家族への誕生日"),
+    )
+    voices = {}
+    for r in rows:
+        d = r["posted_at"]
+        voices[r["product_id"]] = {
+            "excerpt": r["comment"][:120],
+            "isFamilyBirthday": True,
+            "postedDate": d.strftime("%Y/%m/%d") if hasattr(d, "strftime") else str(d),
+        }
+    return voices
+
 
 def to_gift(r: dict) -> dict:
     """DB の列名 → 画面（lib/api.ts の Gift 型）の項目名。画面側は1週目のまま変えない"""

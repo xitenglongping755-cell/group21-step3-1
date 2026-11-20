@@ -20,23 +20,27 @@ export default function ResultCard({ gift, rank, featured = false, detail = fals
 
       {detail && (
         <>
-          {/* 【FR-06】合う理由＝一致したタグ名。reasons が返ってきたときだけ出す */}
-          {gift.reasons && gift.reasons.length > 0 && (
-            <p className="reasons">合う理由：{gift.reasons.join("・")}</p>
-          )}
-
-          {/* 【FR-06】使用談。ある商品には声を、ない商品には無い旨を出す */}
-          {gift.voice ? (
-            <blockquote className="voice">
-              {gift.voice.isFamilyBirthday && (
-                <span className="voice-label">家族の誕生日に贈った方の声</span>
-              )}
-              「{gift.voice.excerpt}」
-              <span className="voice-date">（{gift.voice.postedDate}）</span>
-            </blockquote>
-          ) : (
-            <p className="voice-none">贈った人の声はまだありません</p>
-          )}
+        {/* 【FR-05】合う理由=一致したタグ名を横に並べる。reasons が返ってきたときだけ出す */}
+        {gift.reasons && gift.reasons.length > 0 && (
+        <div className="reasons">
+        <span className="reasons-label">合う理由</span>
+        {gift.reasons.map((r) => (
+        <span className="reason-tag" key={r}>{r}</span>
+        ))}
+        </div>
+        )}
+        {/* 【FR-06】使用談。ある商品には声を、ない商品には無い旨を出す */}
+        {gift.voice ? (
+        <blockquote className="voice">
+        {gift.voice.isFamilyBirthday && (
+        <span className="voice-label">家族に贈った方の声</span>
+        )}
+        「{gift.voice.excerpt}」
+        <span className="voice-date">({gift.voice.postedDate})</span>
+        </blockquote>
+        ) : (
+        <p className="voice-none">贈った人の声はまだありません</p>
+        )}
         </>
       )}
     </div>

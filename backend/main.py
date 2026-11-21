@@ -135,12 +135,15 @@ def family_search(
     )
 
 
+
     # ③ /api/search と同じ形に、合う理由（reasons）と声（voice）を足して返す
-    voices = fetch_voices([r["product_id"] for r in rows])
+    ids = [r["product_id"] for r in rows]
+    voices = fetch_voices(ids)
+    reasons = fetch_reasons(ids, tag_ids)
     results = []
     for r in rows:
         g = to_gift(r)
-        g["reasons"] = []
+        g["reasons"] = reasons.get(r["product_id"], [])
         g["voice"] = voices.get(r["product_id"])
         results.append(g)
     return {"total": total, "results": results}
@@ -185,6 +188,30 @@ def fetch_voices(product_ids: list[str]) -> dict:
             "postedDate": d.strftime("%Y/%m/%d") if hasattr(d, "strftime") else str(d),
         }
     return voices
+
+
+def fetch_reasons(product_ids: list[str], tag_ids: list[int]) -> dict:
+    """選んだタグのうち、商品ごとに付いている確認済みのタグ名（使う場面 → 実用、表示順）。SELECT だけ"""
+    if not product_ids or not tag_ids:
+        return {}
+    p_ph = ", ".join(["%s"] * len(product_ids))
+    t_ph = ", ".join(["%s"] * len(tag_ids))
+    rows = fetch_all(
+        f"""SELECT pt.product_id, u.tag_name
+            FROM product_usage_tags pt
+            JOIN usage_tags u ON u.tag_id = pt.tag_id
+            WHERE pt.product_id IN ({p_ph})
+              AND pt.tag_id IN ({t_ph})
+              AND pt.check_status = 'ok'
+            ORDER BY pt.product_id,
+                     CASE u.tag_type WHEN 'scene' THEN 1 ELSE 2 END,
+                     u.display_order""",
+        (*product_ids, *tag_ids),
+    )
+    reasons = {}
+    for r in rows:
+        reasons.setdefault(r["product_id"], []).append(r["tag_name"])
+    return reasons
 
 
 def to_gift(r: dict) -> dict:

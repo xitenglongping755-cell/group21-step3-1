@@ -32,3 +32,9 @@ body { margin:0; font-family:"Hiragino Sans","Yu Gothic","Meiryo",sans-serif; co
 .voice-label { display: block; font-size: 12px; font-weight: 700; color: var(--accent); margin-bottom: 2px; }
 .voice-date { font-size: 12px; color: var(--sub); margin-left: 4px; }
 .voice-none { font-size: 13px; color: var(--sub); margin: 8px 0 0; }
+/* 検索中のスピナーと、検索中に押せないボタン */
+.form button[type="submit"] { display: inline-flex; align-items: center; justify-content: center; }
+.form button[type="submit"]:disabled { opacity: 0.85; cursor: wait; }
+.modes button:disabled { opacity: 0.5; cursor: not-allowed; }
+.spinner { display: inline-block; width: 14px; height: 14px; margin-right: 6px; border: 2px solid rgba(255, 255, 255, 0.4); border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }

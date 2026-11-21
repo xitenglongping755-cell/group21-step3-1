@@ -22,7 +22,7 @@ export default function Home() {
   const [priceBand, setPriceBand] = useState("");                         // 価格帯（取引先へのお礼）
   const [results, setResults] = useState<Gift[] | null>(null);            // 検索結果
   const [error, setError] = useState("");                                 // つながらないときの文言
-
+  const [loading, setLoading] = useState(false);                          // 検索中かどうか（スピナーを出し、タブとボタンを押せなくする）
   // 【FR-01】家族への誕生日タブの状態
   const [usageTags, setUsageTags] = useState<UsageTag[]>([]); // 質問の選択肢（APIから受け取る）
   const [sceneTagIds, setSceneTagIds] = useState<number[]>([]);     // 使う場面（最大2つ・空=分からない）
@@ -49,7 +49,9 @@ export default function Home() {
   // ② 検索ボタンの処理（API に聞くので、結果が返るまで待つ＝async/await）
   async function onSearch(e: React.FormEvent) {
     e.preventDefault(); // ページの再読み込みを止める
+    if (loading) return; // 検索中にもう一度押されても、2回目は送らない
     setError("");
+    setLoading(true); // 検索中にする（ボタンにスピナー、タブは押せなくなる）
     // いま開いているタブの条件だけを送る（もう一方のタブの入力は送らない）
     try {
       if (mode === "family") {
@@ -71,6 +73,8 @@ export default function Home() {
     } catch (err) {
       setResults(null);
       setError(`APIにつながりません：${(err as Error).message}`); // 原因はブラウザの Console に出る
+    } finally {
+      setLoading(false); // うまくいっても、エラーでも、最後に検索中を終える
     }
   }
 
@@ -104,10 +108,10 @@ export default function Home() {
 
       {/* タブ：state(mode)＋条件で出し分ける */}
       <nav className="modes">
-        <button className={mode === "standard" ? "on" : ""} onClick={() => { setMode("standard"); setResults(null); }}>いまの検索</button>
-        <button className={mode === "business" ? "on" : ""} onClick={() => { setMode("business"); setResults(null); }}>取引先へのお礼</button>
+        <button disabled={loading} className={mode === "standard" ? "on" : ""} onClick={() => { setMode("standard"); setResults(null); }}>いまの検索</button>
+        <button disabled={loading} className={mode === "business" ? "on" : ""} onClick={() => { setMode("business"); setResults(null); }}>取引先へのお礼</button>
         {/* 【FR-01】3つ目のタブ */}
-        <button className={mode === "family" ? "on" : ""} onClick={() => { setMode("family"); setResults(null); }}>家族への誕生日</button>
+        <button disabled={loading} className={mode === "family" ? "on" : ""} onClick={() => { setMode("family"); setResults(null); }}>家族への誕生日</button>
       </nav>
 
       <form className="form" onSubmit={onSearch}>
@@ -153,7 +157,16 @@ export default function Home() {
             </select>
           </>
         )}
-        <button type="submit">検索</button>
+        <button type="submit" disabled={loading} aria-busy={loading}>
+          {loading ? (
+            <>
+              <span className="spinner" aria-hidden="true" />
+              検索中…
+            </>
+          ) : (
+            "検索"
+          )}
+        </button>
       </form>
 
       {error && <p className="summary">{error}</p>}
